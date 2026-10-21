@@ -136,7 +136,11 @@
 
 ### 方式一 · 插件市场
 
-AstrBot 管理面板 → 插件市场 → 填本仓库地址安装。
+AstrBot 管理面板 → 插件市场 → 填入仓库地址：
+
+`
+https://github.com/guanlanke/qinyu-tts
+`
 
 ### 方式二 · 上传 zip
 
