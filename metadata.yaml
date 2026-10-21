@@ -1,0 +1,15 @@
+name: astrbot_plugin_qinyu
+display_name: 情语
+desc: 有情绪的语音。说话、朗读、唱歌共用一套引擎与风格——一句话能念出来，也能唱出来。
+version: v1.2.2
+author: 二改作者（详见 README）
+repo: https://github.com/YOUR_GITHUB/astrbot_plugin_qinyu
+entry: main.py
+homepage: https://github.com/YOUR_GITHUB/astrbot_plugin_qinyu
+license: AGPL-3.0
+tags:
+  - tts
+  - singing
+  - voice
+  - mimo
+  - ai-modified

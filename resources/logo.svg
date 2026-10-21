@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3e2c78"/>
+      <stop offset="100%" stop-color="#121022"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g fill="#96d2ff" opacity="0.92">
+    <rect x="165" y="210" width="22" height="92" rx="11"/>
+    <rect x="207" y="160" width="22" height="192" rx="11"/>
+    <rect x="249" y="120" width="22" height="272" rx="11"/>
+    <rect x="291" y="175" width="22" height="162" rx="11"/>
+    <rect x="333" y="225" width="22" height="62" rx="11"/>
+  </g>
+  <g fill="#ff8ac4">
+    <ellipse cx="182" cy="352" rx="32" ry="32"/>
+    <rect x="200" y="176" width="16" height="180" rx="8"/>
+    <polygon points="216,176 286,206 286,246 216,216"/>
+  </g>
+</svg>

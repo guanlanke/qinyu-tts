@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>唱歌 · 情语</title>
+    <!-- 带版本指纹：插件更新后浏览器不会继续用旧样式/脚本 -->
+    <link rel="stylesheet" href="./style.css?v=4.2.0" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-head">
+        <div class="head-main">
+          <p class="eyebrow">情语</p>
+          <h1>唱歌</h1>
+        </div>
+        <span class="badge" id="badge" data-state="idle">…</span>
+      </header>
+
+      <!-- 主视觉：当前时长 -->
+      <section class="stage" aria-label="唱多久">
+        <div class="stage-value">
+          <span class="stage-number" id="length-value">—</span>
+          <span class="stage-unit">秒</span>
+        </div>
+        <p class="stage-caption" id="length-caption">正在读取…</p>
+
+        <div class="segmented" id="segmented" style="--seg-count: 4; --seg-index: 0">
+          <span class="seg-thumb" aria-hidden="true"></span>
+          <button type="button" data-preset="short">短</button>
+          <button type="button" data-preset="medium">中</button>
+          <button type="button" data-preset="long">长</button>
+          <button type="button" data-preset="xlong">很长</button>
+        </div>
+      </section>
+
+      <!-- 统一 -->
+      <section class="row-card" aria-label="私聊与群聊">
+        <div class="row-card-text">
+          <span class="row-card-title">私聊与群聊</span>
+          <span class="row-card-note" id="unify-note">—</span>
+        </div>
+        <button type="button" class="btn btn-primary" id="unify">统一</button>
+      </section>
+
+      <nav class="links" aria-label="更多入口">
+        <button type="button" class="link" id="open-more" aria-expanded="false">更多设置</button>
+        <button type="button" class="link" id="open-diag" aria-expanded="false">诊断</button>
+      </nav>
+
+      <!-- ============ 更多设置 ============ -->
+      <section class="drawer" id="drawer-more" hidden>
+        <div class="drawer-inner">
+          <h2>更多设置</h2>
+
+          <div class="group">
+            <div class="row">
+              <label class="row-label" for="singing_target_seconds">精确时长</label>
+              <div class="stepper">
+                <button type="button" data-step="singing_target_seconds" data-delta="-5" aria-label="减少 5 秒">-</button>
+                <input type="number" id="singing_target_seconds" min="15" max="300" step="5" />
+                <button type="button" data-step="singing_target_seconds" data-delta="5" aria-label="增加 5 秒">+</button>
+              </div>
+            </div>
+            <label class="row row-switch">
+              <span class="row-label">歌词不够就补唱一遍</span>
+              <span class="switch"><input type="checkbox" id="singing_fill_short" /></span>
+            </label>
+          </div>
+          <p class="hint">改精确时长会退出上面的四挡预设。补唱用于模型写得太短时凑满。</p>
+
+          <div class="group">
+            <label class="row row-switch">
+              <span class="row-label">夜间不唱歌</span>
+              <span class="switch"><input type="checkbox" id="singing_quiet_hours_enable" /></span>
+            </label>
+            <div class="row">
+              <label class="row-label" for="singing_quiet_hours">时间段</label>
+              <input type="text" id="singing_quiet_hours" placeholder="23:30-07:00" />
+            </div>
+          </div>
+
+          <div class="group">
+            <label class="row row-switch">
+              <span class="row-label">允许私聊与群聊不同</span>
+              <span class="switch"><input type="checkbox" id="allow-split" /></span>
+            </label>
+
+            <div id="split-group" hidden>
+              <p class="hint">关闭后两边强制一致。开启时按下面分别设置，填 0 或留空表示跟随。</p>
+              <div class="row">
+                <label class="row-label" for="singing_target_seconds_private">私聊时长</label>
+                <div class="stepper">
+                  <button type="button" data-step="singing_target_seconds_private" data-delta="-10" aria-label="减少">-</button>
+                  <input type="number" id="singing_target_seconds_private" min="0" max="300" step="10" />
+                  <button type="button" data-step="singing_target_seconds_private" data-delta="10" aria-label="增加">+</button>
+                </div>
+              </div>
+              <div class="row">
+                <label class="row-label" for="singing_quiet_hours_private">私聊时段</label>
+                <input type="text" id="singing_quiet_hours_private" placeholder="留空=跟随" />
+              </div>
+              <div class="row">
+                <label class="row-label" for="singing_target_seconds_group">群聊时长</label>
+                <div class="stepper">
+                  <button type="button" data-step="singing_target_seconds_group" data-delta="-10" aria-label="减少">-</button>
+                  <input type="number" id="singing_target_seconds_group" min="0" max="300" step="10" />
+                  <button type="button" data-step="singing_target_seconds_group" data-delta="10" aria-label="增加">+</button>
+                </div>
+              </div>
+              <div class="row">
+                <label class="row-label" for="singing_quiet_hours_group">群聊时段</label>
+                <input type="text" id="singing_quiet_hours_group" placeholder="留空=跟随" />
+              </div>
+            </div>
+          </div>
+
+          <div class="drawer-foot">
+            <button type="button" class="link danger" id="reset">恢复默认</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 诊断 ============ -->
+      <section class="drawer" id="drawer-diag" hidden>
+        <div class="drawer-inner">
+          <h2>诊断</h2>
+          <dl class="facts" id="facts">
+            <dt>状态</dt><dd>读取中…</dd>
+          </dl>
+
+          <div class="group" id="divergence" hidden>
+            <h3>不一致的会话</h3>
+            <table class="bindings">
+              <thead>
+                <tr><th>会话</th><th>类型</th><th>引擎</th><th>朗读</th><th>唱歌</th><th>状态</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="group">
+            <h3>命令</h3>
+            <p class="hint mono">
+              /tts_sing &lt;歌词&gt;<br />
+              /tts_set 时长 中<br />
+              /tts_unify<br />
+              /tts_diff
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+    <script type="module" src="./app.js?v=4.2.0"></script>
+  </body>
+</html>
