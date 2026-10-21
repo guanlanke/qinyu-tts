@@ -71,6 +71,66 @@
 
 ---
 
+## 项目结构
+
+```
+astrbot_plugin_qinyu/
+├── main.py                   插件主体（2690 行）：事件钩子、唱歌意图解析、TTS 调度、
+│                             会话绑定、配置读写、WebUI 接口、全部 /tts_* 指令
+├── __init__.py               插件入口，导出 Star 子类供 AstrBot 加载
+├── metadata.yaml             插件元信息：名称、版本、作者、协议、入口文件
+├── _conf_schema.json         配置面板结构（1236 行）：五组配置项的定义、默认值、选项与说明
+│
+├── engines/                  引擎层：每个提供商一个子包，同一套接口
+│   ├── base.py               TTSEngine 抽象基类：synthesize / close / 能力声明
+│   ├── __init__.py           引擎注册表 + get_engine 工厂
+│   ├── mimo/                 MiMo（小米）—— 唯一支持唱歌的引擎
+│   │   ├── v2_5.py           V2.5 主引擎：朗读与唱歌两条链路的 payload 构造
+│   │   ├── v2.py             V2 引擎：<style> 标签体系
+│   │   ├── singing.py        唱歌核心（832 行）：歌词清洗、标签处理、切片、
+│   │   │                     音色解析、指令构造、风格聚合
+│   │   ├── tone.py           语气层：从人设提炼语气特征，生成朗读指导
+│   │   ├── v2_5_design.py    VoiceDesign：用文本描述生成音色（不支持唱歌）
+│   │   └── v2_5_clone.py     VoiceClone：用音频样本克隆音色（不支持唱歌）
+│   ├── openai/compat.py      OpenAI 兼容接口 /v1/audio/speech
+│   ├── volcengine/           火山引擎 SAMI
+│   ├── aliyun/               阿里云百炼 CosyVoice
+│   ├── azure/                Azure Cognitive Services（SSML）
+│   ├── elevenlabs/           ElevenLabs
+│   └── custom_http/          自定义 HTTP：模板化接入任意 TTS API
+│
+├── views/singing/            WebUI 唱歌控制面板
+│   ├── index.html            页面结构：唱多久、私聊群聊、诊断三层
+│   ├── app.js                前端逻辑：调用插件注册的 Web API
+│   └── style.css             样式与动效（支持 prefers-reduced-motion）
+│
+├── tests/                    单元测试，214 项
+│   ├── test_singing.py       歌词处理、切片、标签、风格、引擎 payload
+│   ├── test_main_singing.py  插件层：唱歌意图解析、调度、指令行为
+│   └── test_tone.py          语气提炼
+│
+├── tools/build_plugin_zip.py 打包脚本：按 AstrBot 解压逻辑生成合规 zip 并验证
+├── resources/                静态资源
+│   └── logo.svg              图标矢量源文件（.png 在根目录供面板读取）
+├── logo.png                  插件图标（AstrBot 面板显示）
+├── requirements.txt          依赖
+├── README.md                 本文档
+├── CHANGELOG.md              完整迭代历史（1427 行，含每次改动的现象、根因、修法）
+└── LICENSE                   AGPL-3.0
+```
+
+### 三个关键文件
+
+**`main.py`** —— 所有"决策"都在这里：什么时候唱歌、歌词从哪来、走哪个引擎、失败了怎么办。它不负责具体算法，只负责调度。
+
+**`engines/mimo/singing.py`** —— 所有"唱歌的细节"都在这里：歌词怎么洗、标签怎么拼、音色怎么选、风格怎么叠加。这是整个项目改动最密集的文件。
+
+**`_conf_schema.json`** —— 用户看到的配置面板。改这个文件等于改界面，所以它的每一项都有 `hint`，写清"改了会影响什么"。
+
+### 为什么引擎单独分目录
+
+十个引擎共用 `TTSEngine` 一套接口（`synthesize(text) -> (bytes, format)`）。加新引擎只要继承这个类、在注册表里登记一行，不用动 `main.py`。唱歌能力靠 `SUPPORTS_SINGING` 声明，主程序据此决定要不要显示唱歌相关配置。
+
 ## 它做了什么
 
 ### 说话
@@ -248,65 +308,6 @@ python tools/build_plugin_zip.py
 ---
 
 ---
-
-## 项目结构
-
-```
-astrbot_plugin_qinyu/
-├── main.py                   插件主体（2690 行）：事件钩子、唱歌意图解析、TTS 调度、
-│                             会话绑定、配置读写、WebUI 接口、全部 /tts_* 指令
-├── __init__.py               插件入口，导出 Star 子类供 AstrBot 加载
-├── metadata.yaml             插件元信息：名称、版本、作者、协议、入口文件
-├── _conf_schema.json         配置面板结构（1236 行）：五组配置项的定义、默认值、选项与说明
-│
-├── engines/                  引擎层：每个提供商一个子包，同一套接口
-│   ├── base.py               TTSEngine 抽象基类：synthesize / close / 能力声明
-│   ├── __init__.py           引擎注册表 + get_engine 工厂
-│   ├── mimo/                 MiMo（小米）—— 唯一支持唱歌的引擎
-│   │   ├── v2_5.py           V2.5 主引擎：朗读与唱歌两条链路的 payload 构造
-│   │   ├── v2.py             V2 引擎：<style> 标签体系
-│   │   ├── singing.py        唱歌核心（832 行）：歌词清洗、标签处理、切片、
-│   │   │                     音色解析、指令构造、风格聚合
-│   │   ├── tone.py           语气层：从人设提炼语气特征，生成朗读指导
-│   │   ├── v2_5_design.py    VoiceDesign：用文本描述生成音色（不支持唱歌）
-│   │   └── v2_5_clone.py     VoiceClone：用音频样本克隆音色（不支持唱歌）
-│   ├── openai/compat.py      OpenAI 兼容接口 /v1/audio/speech
-│   ├── volcengine/           火山引擎 SAMI
-│   ├── aliyun/               阿里云百炼 CosyVoice
-│   ├── azure/                Azure Cognitive Services（SSML）
-│   ├── elevenlabs/           ElevenLabs
-│   └── custom_http/          自定义 HTTP：模板化接入任意 TTS API
-│
-├── views/singing/            WebUI 唱歌控制面板
-│   ├── index.html            页面结构：唱多久、私聊群聊、诊断三层
-│   ├── app.js                前端逻辑：调用插件注册的 Web API
-│   └── style.css             样式与动效（支持 prefers-reduced-motion）
-│
-├── tests/                    单元测试，214 项
-│   ├── test_singing.py       歌词处理、切片、标签、风格、引擎 payload
-│   ├── test_main_singing.py  插件层：唱歌意图解析、调度、指令行为
-│   └── test_tone.py          语气提炼
-│
-├── tools/build_plugin_zip.py 打包脚本：按 AstrBot 解压逻辑生成合规 zip 并验证
-├── resources/logo.svg        图标矢量源文件
-├── logo.png                  插件图标（AstrBot 面板显示）
-├── requirements.txt          依赖
-├── README.md                 本文档
-├── CHANGELOG.md              完整迭代历史（1427 行，含每次改动的现象、根因、修法）
-└── LICENSE                   AGPL-3.0
-```
-
-### 三个关键文件
-
-**`main.py`** —— 所有"决策"都在这里：什么时候唱歌、歌词从哪来、走哪个引擎、失败了怎么办。它不负责具体算法，只负责调度。
-
-**`engines/mimo/singing.py`** —— 所有"唱歌的细节"都在这里：歌词怎么洗、标签怎么拼、音色怎么选、风格怎么叠加。这是整个项目改动最密集的文件。
-
-**`_conf_schema.json`** —— 用户看到的配置面板。改这个文件等于改界面，所以它的每一项都有 `hint`，写清"改了会影响什么"。
-
-### 为什么引擎单独分目录
-
-十个引擎共用 `TTSEngine` 一套接口（`synthesize(text) -> (bytes, format)`）。加新引擎只要继承这个类、在注册表里登记一行，不用动 `main.py`。唱歌能力靠 `SUPPORTS_SINGING` 声明，主程序据此决定要不要显示唱歌相关配置。
 
 ## 关于名字
 
