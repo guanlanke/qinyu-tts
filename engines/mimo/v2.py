@@ -297,7 +297,9 @@ class MiMoV2Engine(TTSEngine):
             text = split_lyric_lines(text) or text
         if not has_lyric_content(text):
             raise ValueError("MiMo V2 唱歌：歌词里只有（换气）（叹气）这类标签，没有可唱的内容")
-        voice = (self.voice or "mimo_default")
+        # 唱歌音色：填了「唱歌专用音色」就用它，留「跟随朗读音色」才回落到朗读音色。
+        # 这里曾经和 v2_5.py 一样写成 self.voice，导致唱歌音色永远不生效。
+        voice = resolve_singing_voice(self.singing_voice, self.voice)
         audio_format = resolve_singing_format(self.singing_format_override, self.audio_format)
         return {
             "model": self.model,

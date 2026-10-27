@@ -328,12 +328,15 @@ class MiMoV25Engine(TTSEngine):
             )
         # 标签永远只写一个「唱歌」：v1.6.0 把气质叠进标签后反而退化
         # 气质与速度改走 user message（官方「自然语言控制」通道）
-        voice = (self.voice or "mimo_default")
+        # 唱歌音色：填了「唱歌专用音色」就用它，留「跟随朗读音色」才回落到朗读音色。
+        # 这里曾经写成 voice = self.voice，而且 configured_voice 硬编码成空串——
+        # 结果唱歌专用音色永远不生效，唱歌一直在用朗读那个音色。
+        voice = resolve_singing_voice(self.singing_voice, self.voice)
         audio_format = resolve_singing_format(self.singing_format_override, self.audio_format)
 
         # 中文歌词配英文嗓会唱出外国人口音，这里显式提示被替换过
-        configured_voice = ""
         follow_set = {item.lower() for item in FOLLOW_VOICE_VALUES}
+        configured_voice = (self.singing_voice or "").strip()
         origin = (
             configured_voice
             if configured_voice and configured_voice.lower() not in follow_set

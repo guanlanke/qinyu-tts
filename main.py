@@ -1196,7 +1196,15 @@ class QingYuPlugin(Star):
     # ---------- 语气与角色气质（内部使用，不对外暴露配置） ----------
 
     async def _persona_text(self, event: AstrMessageEvent) -> str:
-        """取当前会话的人设文本：优先用 on_llm_request 缓存下来的系统提示词。"""
+        """取当前会话的人设文本。
+
+        优先用 on_llm_request 缓存的那次系统提示词——那是这一次请求**实际用的**人设，
+        比再去 persona_manager 查一遍更准。
+
+        但缓存只在本事件内有效：改了人设之后，AstrBot 会重新组装系统提示词，
+        新事件里的缓存自然就是新内容。所以这里**不看任何跨事件缓存**，
+        否则改完人设得清消息记录才生效。
+        """
         cached = getattr(event, "_qinyu_persona", "")
         if isinstance(cached, str) and cached.strip():
             return cached.strip()
@@ -1643,6 +1651,21 @@ class QingYuPlugin(Star):
         kind = "唱歌语音" if singing else "语音"
         logger.info(f"[情语] 发送{kind} ({engine.instance_name}): {speak_text[:80]}")
         record = Comp.Record(file=audio_path_str, url=audio_path_str)
+
+        # 「一条回复只发一条语音」。
+        # AstrBot 的 RespondStage 在分段模式下会**按 chain 里的组件逐个发送**，
+        # 所以只要 chain 里还剩图片、引用、@ 这类组件，就会被拆成好几条消息发出去。
+        # 开启这个开关后，合成成功时把 chain 压成单一 Record，
+        # 无论平台是否开了分段回复，都只会发出一条语音。
+        if bool(self.config.get("tts_single_message", True)):
+            dropped = max(0, len(result.chain) - 1)
+            result.chain = [record]
+            if dropped:
+                logger.debug("[情语] 单条语音模式：丢弃 %s 个附带组件（图片/引用/@）", dropped)
+            if tail_text:
+                logger.info("[情语] 已丢弃唱歌标签外的 %s 字", len(tail_text))
+            return
+
         new_chain = []
         inserted_record = False
         for component in result.chain:
@@ -3013,6 +3036,7 @@ class QingYuPlugin(Star):
         errors: dict = {}
         for raw_key, raw_value in values.items():
             key = str(raw_key)
+
             if key not in WEB_EDITABLE_KEYS:
                 errors[key] = "不支持的配置项"
                 continue
@@ -3230,6 +3254,65 @@ class QingYuPlugin(Star):
                 reason = getattr(engine, "SINGING_UNSUPPORTED_REASON", "当前模型不支持唱歌")
                 problems.append(f"唱歌不可用：{reason}")
                 lines.append(f"唱歌　 不可用 {MARK_BAD}（{reason}）")
+
+        # 克隆音色：样本与当前选择，直接摆出来，免得「不知道咋调用」
+        try:
+            clone_cfg = next(
+                (
+                    c
+                    for c in self._list_engines()
+                    if _as_str(c.get("__template_key")) == "mimo_v2_5_voiceclone"
+                ),
+                None,
+            )
+            samples = [
+                Path(str(p)).name
+                for p in (self.config.get("voice_clone_samples") or [])
+                if str(p).strip()
+            ]
+            if clone_cfg is None:
+                lines.append(
+                    f"克隆　 未添加 VoiceClone 引擎（样本 {len(samples)} 个）"
+                )
+            elif not samples:
+                lines.append(f"克隆　 引擎已建但没上传样本 {MARK_BAD}")
+                problems.append(
+                    "VoiceClone 没有样本：到配置页「音色克隆样本」上传一段 10~30 秒的清晰人声"
+                )
+            else:
+                want = _as_str(clone_cfg.get("voice_sample_name")).strip()
+                actual = want or f"{samples[0]}（默认取第一个）"
+                ok = any(Path(s).name == want for s in samples) if want else True
+                lines.append(
+                    f"克隆　 {len(samples)} 个样本，当前 {actual} "
+                    f"{MARK_OK if ok else MARK_BAD}"
+                )
+                if not ok:
+                    problems.append(
+                        f"克隆样本名 '{want}' 不在已上传列表里，去配置页「音色克隆样本」核对文件名"
+                    )
+        except Exception:  # noqa: BLE001
+            lines.append("克隆　 状态读取失败")
+
+        # 人设：改了不生效是常见困惑，这里把「读到了什么」直接摆出来
+        try:
+            _pm = getattr(self.context, "persona_manager", None)
+            if _pm is None:
+                lines.append(f"人设　 平台未提供 persona_manager {MARK_BAD}")
+            else:
+                lines.append(
+                    f"人设　 接口可用 {MARK_OK}（每次事件重新读取，不吃旧缓存）"
+                )
+        except Exception:  # noqa: BLE001
+            lines.append("人设　 读取接口异常")
+
+        # 单条语音
+        single = bool(self.config.get("tts_single_message", True))
+        lines.append(
+            f"单条语音 {'开' if single else '关'} "
+            f"{MARK_OK if single else MARK_BAD}"
+            + ("" if single else "（会被分段回复拆成多段）")
+        )
 
         # 分段回复会把一条回复拆成多条消息，TTS 只拿到其中一段，语音就被切碎。
         segmented, _seg_note = self._segmented_reply_state()

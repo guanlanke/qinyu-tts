@@ -8,7 +8,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue?style=flat-square)](https://github.com/AstrBotDevs/AstrBot)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.2.5-orange?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.2.6-orange?style=flat-square)]()
 
 </div>
 
@@ -292,6 +292,40 @@ python tools/build_plugin_zip.py
 **说话**：什么都不用做，机器人回复时自动转语音。
 
 **唱歌**：`/tts_sing <歌词>`，或直接说「唱首雨爱」。
+
+### 克隆音色：选它当朗读引擎就行
+
+VoiceClone 拿一段录音克隆出那个人的声音。**它只能朗读，不能唱歌**——官方限制。
+
+#### 三步
+
+**1. 上传样本**（配置页 →「音色克隆样本」）
+
+| 项 | 要求 |
+|---|---|
+| 时长 | 10~30 秒 |
+| 内容 | 单人、连续、自然 |
+| 质量 | 无背景音乐、无噪音、无回声 |
+| 格式 | mp3 / wav / m4a |
+
+**2. 添加引擎**：引擎列表 →「[MiMo] VoiceClone」→ 填 API Key
+
+**3. 设为朗读引擎**：「② 朗读引擎」选 mimo_clone
+
+**就这三步。** 不需要再改「朗读音色」那一项——克隆样本本身就是音色。也不影响唱歌，唱歌走「③ 唱歌引擎」，可以继续用 MiMo 预置音色。
+
+#### 多个样本
+
+在「使用哪个样本」里填文件名（**扩展名可省略**，我的声音 和 我的声音.mp3 都能认）。留空用第一个。
+
+#### 常见问题
+
+| 现象 | 原因 |
+|---|---|
+| 启动时报「VoiceClone 需要音色样本」 | 没上传样本，或上传后没重载插件 |
+| 未找到名为 'xxx' 的样本文件 | 名字对不上，核对配置页里的实际文件名 |
+| 合成失败 / 400 | API Key 不对，或样本格式不支持 |
+| 声音不像 | 样本太短、有背景音、或多个说话人 |
 
 ### 指令速查
 

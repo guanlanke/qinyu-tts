@@ -478,7 +478,11 @@ function bindEngineEvents() {
       if (!btn || btn.disabled) return;
       const kind = btn.dataset.kind;
       const value = btn.dataset.value;
-      queue(kind === "speech" ? { active_engine: value } : { singing_engine: value });
+      let patch;
+      if (kind === "speech") patch = { active_engine: value };
+      else if (kind === "singing") patch = { singing_engine: value };
+
+      queue(patch);
       // 立即在界面上反映选中态，等后端回执再校正
       box.querySelectorAll(".engine-card").forEach((el) => {
         el.setAttribute("aria-checked", el === btn ? "true" : "false");

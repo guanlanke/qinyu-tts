@@ -51,13 +51,30 @@ class TTSEngine(ABC):
         if not sample_name.strip():
             raw_path = sample_paths[0]
         else:
-            raw_path = next(
-                (p for p in sample_paths if Path(p).name == sample_name.strip()),
-                None,
-            )
-            if raw_path is None:
-                available = ", ".join(Path(p).name for p in sample_paths)
-                raise FileNotFoundError(f"未找到名为 '{sample_name}' 的样本文件。已上传: {available}")
+            wanted = sample_name.strip()
+            # 精确匹配优先；其次允许省略扩展名（配置里常填 "样本名"，实际文件是 "样本名.mp3"），
+            # 再次允许填的是文件主干名。否则会出现「明明传上去了却说找不到」。
+            exact = next((p for p in sample_paths if Path(p).name == wanted), None)
+            if exact is not None:
+                raw_path = exact
+            else:
+                stem_matches = [
+                    p for p in sample_paths if Path(p).stem == wanted
+                ]
+                if len(stem_matches) == 1:
+                    raw_path = stem_matches[0]
+                elif len(stem_matches) > 1:
+                    names = ", ".join(Path(p).name for p in stem_matches)
+                    raise FileNotFoundError(
+                        f"'{wanted}' 对应多个样本文件（{names}），"
+                        "请在「音色样本文件名」里写完整文件名（含扩展名）"
+                    )
+                else:
+                    available = ", ".join(Path(p).name for p in sample_paths)
+                    raise FileNotFoundError(
+                        f"未找到名为 '{sample_name}' 的样本文件。已上传: {available}"
+                        "（填文件名时可省略扩展名）"
+                    )
 
         candidates = [
             Path(raw_path),

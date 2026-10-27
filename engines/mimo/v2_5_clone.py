@@ -1,10 +1,14 @@
 """MiMo V2.5 TTS VoiceClone 引擎"""
 
 import base64
+import logging
+from pathlib import Path
 
 import httpx
 
 from ..base import TTSEngine
+
+logger = logging.getLogger(__name__)
 
 
 class MiMoV25CloneEngine(TTSEngine):
@@ -33,6 +37,14 @@ class MiMoV25CloneEngine(TTSEngine):
         if not self.api_key:
             raise ValueError("MiMo V2.5 VoiceClone TTS: api_key 不能为空")
 
+        # 没有样本就没法克隆。这里提前拦下来，报错里直接写清下一步，
+        # 而不是等到第一次合成才抛 FileNotFoundError。
+        if not self._sample_paths:
+            raise ValueError(
+                "VoiceClone 需要音色样本：到配置页「音色克隆样本」上传一段 10~30 秒的"
+                "单人清晰人声（mp3 / wav / m4a），再重载插件"
+            )
+
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(timeout=self.timeout)
@@ -44,8 +56,33 @@ class MiMoV25CloneEngine(TTSEngine):
             self._voice_base64 = self._encode_sample_base64(path, with_prefix=True)
         return self._voice_base64
 
+    def list_samples(self) -> list[str]:
+        """已上传的样本文件名列表。"""
+        return [Path(p).name for p in self._sample_paths if p]
+
+    def describe_sample(self) -> str:
+        """当前生效的样本：填了名字就是它，没填就是第一个。"""
+        if self._sample_name.strip():
+            return self._sample_name.strip()
+        if self._sample_paths:
+            return f"{Path(self._sample_paths[0]).name}（默认取第一个）"
+        return "（未上传样本）"
+
+    def switch_sample(self, name: str) -> str:
+        """切换样本并清掉缓存，返回实际生效的文件名。"""
+        path = self._resolve_sample_path(self._sample_paths, name)
+        self._sample_name = Path(path).name
+        self._voice_base64 = None  # 换样本必须重编码，否则还在用旧声音
+        return Path(path).name
+
     async def synthesize(self, text: str) -> tuple[bytes, str]:
         client = self._get_client()
+        logger.info(
+            "[%s] 克隆朗读：样本=%s 字数=%s",
+            self.instance_name,
+            self.describe_sample(),
+            len(text or ""),
+        )
         url = f"{self.api_base.rstrip('/')}/chat/completions"
 
         messages = []

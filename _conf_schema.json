@@ -23,7 +23,7 @@
       "mimo_design",
       "mimo_clone"
     ],
-    "hint": "点选即可，不用打字。候选是各引擎添加时的默认实例名称；如果你改过「实例名称」，选项里没有就手动填那个名字。"
+    "hint": "点选即可。选 mimo_clone（VoiceClone）就会用你上传的克隆音色朗读——不需要再改「朗读音色」那一项，克隆样本本身就是音色。唱歌走③单独的引擎，不会受这里影响。"
   },
   "singing_engine": {
     "description": "③ 唱歌引擎（可与朗读不同）",
@@ -43,7 +43,7 @@
       "mimo_design",
       "mimo_clone"
     ],
-    "hint": "点选即可。「跟随朗读引擎」= 用②那个引擎唱歌；想分开就选另一个——例如朗读选 mimo_v2.5、这里选 minimax。选到不支持唱歌的引擎会自动回退并记日志。"
+    "hint": "点选即可。「跟随朗读引擎」= 用②那个引擎唱歌。注意：VoiceClone 不支持唱歌，如果②选的是它，这里要单独指定 MiMo V2.5 或 MiniMax。"
   },
   "engines": {
     "type": "template_list",
@@ -579,13 +579,13 @@
             "default": ""
           },
           "voice_sample_name": {
-            "description": "样本文件名",
+            "description": "使用哪个样本（留空=第一个）",
             "type": "string",
             "default": "",
-            "hint": "留空则使用第一个"
+            "hint": "填上面「音色克隆样本」里某个文件名，可以省略扩展名。留空则用第一个。不想手填就用 /tts_clone 查看列表并一键切换。"
           }
         },
-        "description": "样本克隆音色 · 不支持唱歌"
+        "description": "克隆音色 · 只朗读 · 设为朗读引擎即用"
       },
       "openai_compat": {
         "name": "[OpenAI] 兼容接口",
@@ -1182,6 +1182,12 @@
     "default": true,
     "hint": "关掉后 /tts_sing 与自动唱歌都失效，普通朗读不受影响。所有会话共用这一项。"
   },
+  "tts_single_message": {
+    "description": "④b 一条回复只发一条语音",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后，合成成功时把整条消息压成一个音频发出——AstrBot 开了「分段回复」也不会把语音拆成好几段。代价是同一轮里的图片、引用、@ 不会再跟着发。关掉则保持原样：有多少组件就发多少条。"
+  },
   "singing_resident_mode": {
     "description": "③b 常驻唱歌（任何唱歌引擎通用）",
     "type": "bool",
@@ -1274,14 +1280,10 @@
     "hint": "平台识别不出管理员身份时，在这里填用户 ID，一行一个。"
   },
   "voice_clone_samples": {
-    "description": "音色克隆样本",
+    "description": "音色克隆样本（上传 10~30 秒人声）",
     "type": "file",
     "default": [],
-    "file_types": [
-      "mp3",
-      "wav"
-    ],
-    "hint": "只有 VoiceClone 引擎需要。上传 mp3 或 wav，建议 10-30 秒清晰人声。"
+    "hint": "上传一段干净的人声（mp3 / wav / m4a），要求：单人、无背景音乐、无环境噪音、10~30 秒。传完去引擎列表添加「[MiMo] VoiceClone」，再把它选为「② 朗读引擎」，就能用这个声音朗读。有多个样本时用 /tts_clone 切换。注意：VoiceClone 不支持唱歌。"
   },
   "tts_text_limit_enable": {
     "description": "启用 TTS 字数上限",
