@@ -1,15 +1,35 @@
 name: astrbot_plugin_qinyu
 display_name: 情语
-desc: 有情绪的语音。说话、朗读、唱歌共用一套引擎与风格——一句话能念出来，也能唱出来。
+short_desc: 说话与唱歌可各用一套引擎的语音插件
+desc: |
+  有情绪的语音。说话、朗读、唱歌共用一套引擎与风格——一句话能念出来，也能唱出来。
+
+  核心能力：
+  - 引擎分离：朗读和唱歌可以指向不同实例，例如 MiMo 说话 + MiniMax 唱歌
+  - 五维风格：整体语调 / 音色质感 / 人设腔调 / 方言 / 角色扮演，任意叠加
+  - 语气自适应：读人设提炼语气特征；没有人设时按回复内容判断（问句、道别、安慰各有说法）
+  - 统一模式：私聊与群聊共用一套音色与时长，不会出现两套配置
+  - 可视化管理面板：点卡片切引擎、一键统一、差异诊断、自检
+
+  支持 10 种引擎：MiMo V2.5（完整唱歌）、MiMo V2、VoiceDesign、VoiceClone、
+  MiniMax、OpenAI 兼容、火山引擎、阿里云百炼、Azure、ElevenLabs、自定义 HTTP。
 version: v1.2.5
 author: guanlanke
 repo: https://github.com/guanlanke/qinyu-tts
+astrbot_version: ">=4.0.0"
+support_platforms:
+  - aiocqhttp
+  - qq_official
+  - telegram
+  - discord
+  - wecom
+social_link: https://github.com/guanlanke
+tags:
+  - tts
+  - 语音
+  - 唱歌
+  - mimo
+  - minimax
 entry: main.py
 homepage: https://github.com/guanlanke/qinyu-tts
 license: AGPL-3.0
-tags:
-  - tts
-  - singing
-  - voice
-  - mimo
-  - ai-modified
