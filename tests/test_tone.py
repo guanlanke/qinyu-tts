@@ -118,3 +118,49 @@ class BuildToneTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class UniversalToneTests(unittest.TestCase):
+    """语气不限定角色：任何人设、甚至没有人设，都要说得出合适的语气。"""
+
+    def test_no_persona_uses_content_mood(self):
+
+        self.assertIn("疑问", tone.build_speech_tone("", "你去哪儿了？"))
+        self.assertIn("道别", tone.build_speech_tone("", "晚安，做个好梦"))
+        self.assertIn("安慰", tone.build_speech_tone("", "别难过，会好的"))
+        self.assertIn("歉意", tone.build_speech_tone("", "对不起，是我搞错了"))
+        self.assertIn("讲明白", tone.build_speech_tone("", "因为服务器重启了"))
+
+    def test_short_reply_is_light(self):
+
+        self.assertIn("随口", tone.build_speech_tone("", "好的"))
+
+    def test_empty_everything_falls_back(self):
+
+        result = tone.build_speech_tone("", "")
+        self.assertTrue(result)
+        self.assertIn("自然", result)
+
+    def test_fast_persona_gets_faster_speed(self):
+
+        self.assertIn("稍快", tone.build_speech_tone("活泼", "嗯"))
+
+    def test_slow_persona_gets_slower_speed(self):
+
+        self.assertIn("稍慢", tone.build_speech_tone("高冷寡言", "嗯"))
+
+    def test_soft_persona_gets_gentle_speed(self):
+
+        self.assertIn("平缓", tone.build_speech_tone("温柔", "嗯"))
+
+    def test_wide_role_coverage(self):
+        """各类角色都要能从人设里读出特征，不能只覆盖甜美那一类。"""
+
+        for persona in (
+            "幽默风趣，爱讲段子",
+            "江湖气，说话直爽",
+            "书卷气，说话文雅",
+            "病娇，占有欲强",
+            "播音腔，字正腔圆",
+            "幼稚憨直",
+        ):
+            self.assertTrue(tone.extract_persona_traits(persona), f"{persona} 没提取到特征")

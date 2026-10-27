@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark" />
     <title>唱歌 · 情语</title>
     <!-- 带版本指纹：插件更新后浏览器不会继续用旧样式/脚本 -->
-    <link rel="stylesheet" href="./style.css?v=4.2.0" />
+    <link rel="stylesheet" href="./style.css?v=1.2.6" />
   </head>
   <body>
     <div class="app">
@@ -32,6 +32,24 @@
           <button type="button" data-preset="medium">中</button>
           <button type="button" data-preset="long">长</button>
           <button type="button" data-preset="xlong">很长</button>
+        </div>
+      </section>
+
+      <!-- 引擎：卡片式点选，不用打字 -->
+      <section class="engine-panel" aria-label="引擎">
+        <div class="engine-head">
+          <span class="engine-title">引擎</span>
+          <span class="engine-note" id="engine-note">—</span>
+        </div>
+
+        <div class="engine-row">
+          <span class="engine-row-label">说话</span>
+          <div class="engine-cards" id="speech-cards" role="radiogroup" aria-label="朗读引擎"></div>
+        </div>
+
+        <div class="engine-row">
+          <span class="engine-row-label">唱歌</span>
+          <div class="engine-cards" id="singing-cards" role="radiogroup" aria-label="唱歌引擎"></div>
         </div>
       </section>
 

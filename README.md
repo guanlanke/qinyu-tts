@@ -8,7 +8,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue?style=flat-square)](https://github.com/AstrBotDevs/AstrBot)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.2.2-orange?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.2.5-orange?style=flat-square)]()
 
 </div>
 
@@ -151,6 +151,29 @@ astrbot_plugin_qinyu/
 | 关键词触发 | 配置关键词表 | 兜底，LLM 没打标签时接管 |
 | 整段原样 | 保持原文送出 | 不做任何清洗，一个字符不动 |
 
+### 引擎可以自由组合
+
+**一个实例不必包揽全部。** 朗读用谁、唱歌用谁，在配置里分开指定：
+
+```
+② 朗读引擎 = mimo_v2.5      →  日常对话，中文自然
+③ 唱歌引擎 = minimax        →  唱歌，成品级音乐生成
+```
+
+反过来也行，也可以都指向同一个实例。留「跟随朗读引擎」就是老行为。
+
+引擎列表里可以放任意多个实例（同一家的不同配置也行），由这两项各挑一个：
+
+| 想达到的效果 | 朗读引擎 | 唱歌引擎 |
+|---|---|---|
+| 简单省事，一套全包 | MiMo V2.5 | 跟随朗读引擎 |
+| 说话自然 + 唱歌好听 | MiMo V2.5 | MiniMax |
+| 说话快而省 + 唱歌自然 | MiniMax Speech-02-turbo | MiMo V2.5 |
+
+选中的唱歌引擎如果不存在、或者不支持唱歌，会自动回退到朗读引擎，并在日志里写明原因——不会静默失败。
+
+> **这套选择是全局的。** 统一模式（默认开启）下，私聊和群聊走同一个朗读引擎、同一个唱歌引擎、同一套音色和时长——不存在「这个群一个音色、那个群另一个音色」的情况。想给某个会话关掉 TTS 可以用 `/tts_off`，但不会变成另一套配置。
+
 ### 风格
 
 | 维度 | 可选值 |
@@ -223,9 +246,10 @@ python tools/build_plugin_zip.py
 ### 第一步 · 配引擎
 
 1. 进入插件配置页
-2. 点「TTS 引擎配置列表」→ 添加引擎（按 `[提供商]` 分组）
-3. 填 API Key、API Base、模型名
-4. 确认机器人已开启 AstrBot 的 TTS 功能
+2. 「引擎列表」→ 添加条目 → 选一个厂商模板
+3. 填 API Key（其余项有默认值，可以不改）
+4. 「② 朗读引擎」和「③ 唱歌引擎」两个下拉框各选一个——**点选即可，不用打字**
+5. 确认机器人已开启 AstrBot 的 TTS 功能
 
 > 💡 列表第一个是默认引擎，也可用「当前生效的引擎实例名称」指定。
 

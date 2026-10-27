@@ -29,6 +29,7 @@ from .volcengine import VolcengineEngine
 from .aliyun import AliyunEngine
 from .azure import AzureEngine
 from .elevenlabs import ElevenLabsEngine
+from .minimax import MiniMaxEngine
 from .custom_http import CustomHTTPEngine
 
 ENGINE_REGISTRY: dict[str, type[TTSEngine]] = {
@@ -42,6 +43,7 @@ ENGINE_REGISTRY: dict[str, type[TTSEngine]] = {
     "azure": AzureEngine,
     "elevenlabs": ElevenLabsEngine,
     "custom_http": CustomHTTPEngine,
+    "minimax": MiniMaxEngine,
 }
 
 #: 支持唱歌模式的引擎模板键，供指令层做能力标注
@@ -59,3 +61,12 @@ def get_engine(engine_config: dict, plugin_config: dict | None = None) -> TTSEng
         available = ", ".join(ENGINE_REGISTRY.keys())
         raise ValueError(f"未知的 TTS 引擎类型: '{template_key}'，可用类型: {available}")
     return engine_cls(engine_config, plugin_config or {})
+
+#: 主题用途：朗读 / 唱歌。两者可以指向不同引擎实例。
+ROLE_SPEECH = "speech"
+ROLE_SINGING = "singing"
+
+
+def engine_supports_singing(engine) -> bool:
+    """这个引擎实例能不能唱歌。"""
+    return bool(getattr(engine, "SUPPORTS_SINGING", False))

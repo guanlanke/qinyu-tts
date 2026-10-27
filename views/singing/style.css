@@ -712,3 +712,113 @@ button:focus-visible {
     max-width: none;
   }
 }
+
+/* ============ 引擎卡片 ============ */
+.engine-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+}
+
+.engine-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.engine-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #eee);
+}
+
+.engine-note {
+  font-size: 12px;
+  color: var(--text-muted, #999);
+}
+
+.engine-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.engine-row-label {
+  flex: 0 0 34px;
+  padding-top: 9px;
+  font-size: 12px;
+  color: var(--text-muted, #999);
+}
+
+.engine-cards {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.engine-card {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  background: transparent;
+  color: var(--text-primary, #ddd);
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 120ms ease;
+}
+
+.engine-card:hover:not(:disabled) {
+  border-color: var(--accent, #7c9cff);
+  background: var(--bg-hover, rgba(124, 156, 255, 0.08));
+}
+
+.engine-card:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.engine-card[aria-checked="true"] {
+  border-color: var(--accent, #7c9cff);
+  background: var(--bg-active, rgba(124, 156, 255, 0.16));
+  color: var(--accent, #a8bcff);
+  font-weight: 600;
+}
+
+/* 选中标记 */
+.engine-card[aria-checked="true"]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #7c9cff);
+}
+
+/* 不能唱歌的卡片：灰掉但可见，鼠标移上去说明原因 */
+.engine-card:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.engine-card .engine-tag {
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--tag-bg, rgba(255, 255, 255, 0.09));
+  color: var(--text-muted, #aaa);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engine-card {
+    transition: none;
+  }
+}

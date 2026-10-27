@@ -1,7 +1,7 @@
 name: astrbot_plugin_qinyu
 display_name: 情语
 desc: 有情绪的语音。说话、朗读、唱歌共用一套引擎与风格——一句话能念出来，也能唱出来。
-version: v1.2.2
+version: v1.2.5
 author: guanlanke
 repo: https://github.com/guanlanke/qinyu-tts
 entry: main.py

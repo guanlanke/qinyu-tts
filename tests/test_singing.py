@@ -1224,6 +1224,64 @@ class GlobalStyleTests(unittest.TestCase):
         self.assertNotIn("（）", payload["messages"][-1]["content"])
 
 
+class MiniMaxSingingTests(unittest.TestCase):
+    """MiniMax 引擎：朗读与唱歌走两个不同接口。"""
+
+    def _engine(self, **overrides):
+        from engines.minimax import MiniMaxEngine
+
+        cfg = {"api_key": "k", "instance_name": "minimax"}
+        cfg.update(overrides)
+        return MiniMaxEngine(cfg)
+
+    def test_declares_singing_support(self):
+        from engines.minimax import MiniMaxEngine
+
+        self.assertTrue(MiniMaxEngine.SUPPORTS_SINGING)
+
+    def test_lyrics_get_structure_tags(self):
+        """纯歌词会被补上 [verse]/[chorus] 结构标记，MiniMax 靠它理解段落。"""
+        engine = self._engine()
+        out = engine._structure_lyrics("第一段歌词\n还在第一段\n\n第二段歌词")
+        self.assertIn("[verse]", out)
+        self.assertIn("[chorus]", out)
+        self.assertIn("第一段歌词", out)
+
+    def test_existing_tags_preserved(self):
+        engine = self._engine()
+        raw = "[verse]\n已有标记\n[chorus]\n副歌"
+        self.assertEqual(engine._structure_lyrics(raw), raw)
+
+    def test_speech_and_music_payload_differ(self):
+        """朗读用 text 字段，唱歌用 prompt+lyrics，两者不共用。"""
+        engine = self._engine()
+        engine.music_prompt = "摇滚，男声，快节奏"
+        structured = engine._structure_lyrics("月亮代表我的心")
+        self.assertIn("[verse]", structured)
+        self.assertIn("月亮代表我的心", structured)
+        self.assertEqual(engine.music_prompt, "摇滚，男声，快节奏")
+
+    def test_voice_and_music_format_are_independent(self):
+        engine = self._engine(voice="female-yujie", format="wav",
+                              music_format="mp3", music_model="music-3.0")
+        self.assertEqual(engine.voice, "female-yujie")
+        self.assertEqual(engine.format, "wav")
+        self.assertEqual(engine.music_format, "mp3")
+        self.assertEqual(engine.music_model, "music-3.0")
+
+    def test_hex_audio_decoded(self):
+        """MiniMax 的 t2a_v2 返回十六进制音频。"""
+        engine = self._engine()
+        data = {"data": {"audio": "48656c6c6f"}}  # "Hello"
+        self.assertEqual(engine._extract_audio(data, "朗读"), b"Hello")
+
+    def test_emotion_inferred_from_tone(self):
+        engine = self._engine()
+        self.assertEqual(engine._guess_emotion("活泼轻快"), "happy")
+        self.assertEqual(engine._guess_emotion("低落难过"), "sad")
+        self.assertEqual(engine._guess_emotion("中性描述"), "")
+
+
 class SingingCapabilityTests(unittest.TestCase):
     def test_registry_exposes_singing_engines(self):
         self.assertIn("mimo_v2_5", SINGING_TEMPLATE_KEYS)

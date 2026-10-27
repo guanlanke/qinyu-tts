@@ -7,17 +7,50 @@
     "hint": "关掉后本插件完全不接管消息，等同于卸载但不丢配置。"
   },
   "active_engine": {
-    "description": "② 当前引擎",
+    "description": "② 朗读引擎（说话用）",
     "type": "string",
-    "default": "",
-    "hint": "填下面引擎列表里某个「实例名称」；留空则用第一个。日常切换用指令 /tts_switch 更方便。"
+    "default": "mimo_v2.5",
+    "options": [
+      "mimo_v2.5",
+      "minimax",
+      "mimo_v2",
+      "openai_tts",
+      "volcengine_tts",
+      "aliyun_tts",
+      "azure_tts",
+      "elevenlabs_tts",
+      "custom_tts",
+      "mimo_design",
+      "mimo_clone"
+    ],
+    "hint": "点选即可，不用打字。候选是各引擎添加时的默认实例名称；如果你改过「实例名称」，选项里没有就手动填那个名字。"
+  },
+  "singing_engine": {
+    "description": "③ 唱歌引擎（可与朗读不同）",
+    "type": "string",
+    "default": "跟随朗读引擎",
+    "options": [
+      "跟随朗读引擎",
+      "mimo_v2.5",
+      "minimax",
+      "mimo_v2",
+      "openai_tts",
+      "volcengine_tts",
+      "aliyun_tts",
+      "azure_tts",
+      "elevenlabs_tts",
+      "custom_tts",
+      "mimo_design",
+      "mimo_clone"
+    ],
+    "hint": "点选即可。「跟随朗读引擎」= 用②那个引擎唱歌；想分开就选另一个——例如朗读选 mimo_v2.5、这里选 minimax。选到不支持唱歌的引擎会自动回退并记日志。"
   },
   "engines": {
     "type": "template_list",
-    "description": "引擎列表",
+    "description": "引擎列表（可加多个，朗读与唱歌各挑一个）",
     "templates": {
       "mimo_v2": {
-        "name": "[MiMo] V2-TTS（预置音色 + style 标签）",
+        "name": "[MiMo] V2-TTS",
         "hint": "小米 MiMo V2 语音合成",
         "items": {
           "instance_name": {
@@ -162,18 +195,6 @@
             "default": true,
             "hint": "默认开启：歌词原样送出，只保留（唱歌）标签 + 一句演唱指令，这条链路实测最好听。上面那五项「全局风格」依然生效，会跟在（唱歌）后面。"
           },
-          "singing_reference_mode": {
-            "description": "对照：参考项目写法（默认关闭）",
-            "type": "bool",
-            "default": false,
-            "hint": "默认关闭。开启后改成照搬参考项目（emotion_router v3.3.4）的严格唱歌写法：全角（唱歌）+「连成一首歌从头唱到尾」指令 + 不截断。想对比两种写法时切换。"
-          },
-          "singing_mode": {
-            "description": "常驻唱歌模式",
-            "type": "bool",
-            "default": false,
-            "hint": "开启后该实例的所有输出（包括普通回答）都以唱歌形式发出，适合做成唱歌专用机器人；日常按需唱歌请保持关闭。"
-          },
           "singing_voice_lock": {
             "description": "锁定音色不串味",
             "type": "bool",
@@ -207,17 +228,6 @@
             "hint": "上面五个「全局」维度已经覆盖语调/音色/腔调，这项通常用不到，留「不指定」即可。",
             "invisible": true
           },
-          "singing_speed": {
-            "description": "演唱速度",
-            "type": "string",
-            "default": "正常",
-            "options": [
-              "正常",
-              "偏慢",
-              "偏快"
-            ],
-            "hint": "速度写进演唱指令（user message），不会加到唱歌标签里——标签只允许一个「唱歌」。「正常」不加任何速度描述。"
-          },
           "singing_takes": {
             "description": "唱歌候选次数",
             "type": "int",
@@ -247,10 +257,11 @@
             "default": "",
             "invisible": true
           }
-        }
+        },
+        "description": "预置音色 · 不支持唱歌"
       },
       "mimo_v2_5": {
-        "name": "[MiMo] V2.5-TTS（精品音色 + 自然语言控制）",
+        "name": "[MiMo] V2.5-TTS",
         "hint": "小米 MiMo V2.5 语音合成",
         "items": {
           "instance_name": {
@@ -401,18 +412,6 @@
             "default": true,
             "hint": "默认开启：歌词原样送出，只保留（唱歌）标签 + 一句演唱指令，这条链路实测最好听。上面那五项「全局风格」依然生效，会跟在（唱歌）后面。"
           },
-          "singing_reference_mode": {
-            "description": "对照：参考项目写法（默认关闭）",
-            "type": "bool",
-            "default": false,
-            "hint": "默认关闭。开启后改成照搬参考项目（emotion_router v3.3.4）的严格唱歌写法：全角（唱歌）+「连成一首歌从头唱到尾」指令 + 不截断。想对比两种写法时切换。"
-          },
-          "singing_mode": {
-            "description": "常驻唱歌模式",
-            "type": "bool",
-            "default": false,
-            "hint": "开启后该实例的所有输出（包括普通回答）都以唱歌形式发出，适合做成唱歌专用机器人；日常按需唱歌请保持关闭。"
-          },
           "singing_voice_lock": {
             "description": "锁定音色不串味",
             "type": "bool",
@@ -446,17 +445,6 @@
             "hint": "上面五个「全局」维度已经覆盖语调/音色/腔调，这项通常用不到，留「不指定」即可。",
             "invisible": true
           },
-          "singing_speed": {
-            "description": "演唱速度",
-            "type": "string",
-            "default": "正常",
-            "options": [
-              "正常",
-              "偏慢",
-              "偏快"
-            ],
-            "hint": "速度写进演唱指令（user message），不会加到唱歌标签里——标签只允许一个「唱歌」。「正常」不加任何速度描述。"
-          },
           "singing_takes": {
             "description": "唱歌候选次数",
             "type": "int",
@@ -486,10 +474,11 @@
             "default": "",
             "hint": "如：用轻快上扬的语调"
           }
-        }
+        },
+        "description": "精品音色 · 支持唱歌"
       },
       "mimo_v2_5_voicedesign": {
-        "name": "[MiMo] V2.5-VoiceDesign（文本描述设计音色）",
+        "name": "[MiMo] VoiceDesign",
         "hint": "通过文本描述设计音色，无需音频样本",
         "items": {
           "instance_name": {
@@ -514,12 +503,6 @@
             "default": "mimo-v2.5-tts-voicedesign",
             "hint": "厂商若更新模型名可在此修改，重置恢复默认"
           },
-          "voice_description": {
-            "description": "音色描述",
-            "type": "text",
-            "default": "",
-            "hint": "如：年轻女性，温柔治愈系"
-          },
           "format": {
             "description": "输出格式",
             "type": "string",
@@ -529,21 +512,28 @@
               "pcm16"
             ]
           },
-          "optimize_text_preview": {
-            "description": "智能润色文本",
-            "type": "bool",
-            "default": false
-          },
           "timeout": {
             "description": "超时（秒）",
             "type": "int",
             "default": 60,
             "invisible": true
+          },
+          "voice_description": {
+            "description": "音色描述",
+            "type": "text",
+            "default": "",
+            "hint": "如：年轻女性，温柔治愈系"
+          },
+          "optimize_text_preview": {
+            "description": "智能润色文本",
+            "type": "bool",
+            "default": false
           }
-        }
+        },
+        "description": "文字设计音色 · 不支持唱歌"
       },
       "mimo_v2_5_voiceclone": {
-        "name": "[MiMo] V2.5-VoiceClone（音频样本克隆）",
+        "name": "[MiMo] VoiceClone",
         "hint": "请先在上方上传样本文件",
         "items": {
           "instance_name": {
@@ -568,12 +558,6 @@
             "default": "mimo-v2.5-tts-voiceclone",
             "hint": "厂商若更新模型名可在此修改，重置恢复默认"
           },
-          "voice_sample_name": {
-            "description": "样本文件名",
-            "type": "string",
-            "default": "",
-            "hint": "留空则使用第一个"
-          },
           "format": {
             "description": "输出格式",
             "type": "string",
@@ -583,21 +567,28 @@
               "pcm16"
             ]
           },
-          "style_prompt": {
-            "description": "风格指令（可选）",
-            "type": "text",
-            "default": ""
-          },
           "timeout": {
             "description": "超时（秒）",
             "type": "int",
             "default": 60,
             "invisible": true
+          },
+          "style_prompt": {
+            "description": "风格指令（可选）",
+            "type": "text",
+            "default": ""
+          },
+          "voice_sample_name": {
+            "description": "样本文件名",
+            "type": "string",
+            "default": "",
+            "hint": "留空则使用第一个"
           }
-        }
+        },
+        "description": "样本克隆音色 · 不支持唱歌"
       },
       "openai_compat": {
-        "name": "[OpenAI] 兼容 TTS（/v1/audio/speech）",
+        "name": "[OpenAI] 兼容接口",
         "hint": "兼容 OpenAI 接口的 TTS 服务",
         "items": {
           "instance_name": {
@@ -634,16 +625,6 @@
               "shimmer"
             ]
           },
-          "speed": {
-            "description": "语速（0.25-4.0）",
-            "type": "float",
-            "default": 1.0,
-            "slider": {
-              "min": 0.25,
-              "max": 4,
-              "step": 0.05
-            }
-          },
           "format": {
             "description": "输出格式",
             "type": "string",
@@ -662,17 +643,45 @@
             "type": "int",
             "default": 30,
             "invisible": true
+          },
+          "speed": {
+            "description": "语速（0.25-4.0）",
+            "type": "float",
+            "default": 1.0,
+            "slider": {
+              "min": 0.25,
+              "max": 4,
+              "step": 0.05
+            }
           }
-        }
+        },
+        "description": "标准 /v1/audio/speech"
       },
       "volcengine": {
-        "name": "[火山引擎] TTS（SAMI API）",
+        "name": "[火山引擎] SAMI",
         "hint": "需在火山引擎控制台获取 appkey 和 token",
         "items": {
           "instance_name": {
             "description": "实例名称（用于标识和切换）",
             "type": "string",
             "default": "volcengine_tts"
+          },
+          "format": {
+            "description": "输出格式",
+            "type": "string",
+            "default": "mp3",
+            "options": [
+              "mp3",
+              "wav",
+              "ogg",
+              "pcm"
+            ]
+          },
+          "timeout": {
+            "description": "超时（秒）",
+            "type": "int",
+            "default": 30,
+            "invisible": true
           },
           "app_id": {
             "description": "AppKey",
@@ -712,17 +721,6 @@
               "step": 0.1
             }
           },
-          "format": {
-            "description": "输出格式",
-            "type": "string",
-            "default": "mp3",
-            "options": [
-              "mp3",
-              "wav",
-              "ogg",
-              "pcm"
-            ]
-          },
           "sample_rate": {
             "description": "采样率",
             "type": "int",
@@ -732,17 +730,12 @@
               "max": 48000,
               "step": 1000
             }
-          },
-          "timeout": {
-            "description": "超时（秒）",
-            "type": "int",
-            "default": 30,
-            "invisible": true
           }
-        }
+        },
+        "description": "字节跳动发音人"
       },
       "aliyun": {
-        "name": "[阿里云百炼] CosyVoice TTS",
+        "name": "[阿里云] CosyVoice",
         "hint": "使用 DashScope OpenAI 兼容接口",
         "items": {
           "instance_name": {
@@ -783,6 +776,12 @@
               "pcm"
             ]
           },
+          "timeout": {
+            "description": "超时（秒）",
+            "type": "int",
+            "default": 30,
+            "invisible": true
+          },
           "volume": {
             "description": "音量（0-100）",
             "type": "int",
@@ -802,23 +801,30 @@
               "max": 2,
               "step": 0.05
             }
-          },
-          "timeout": {
-            "description": "超时（秒）",
-            "type": "int",
-            "default": 30,
-            "invisible": true
           }
-        }
+        },
+        "description": "DashScope 兼容接口"
       },
       "azure": {
-        "name": "[Azure] Cognitive Services TTS",
+        "name": "[Azure] 认知服务",
         "hint": "需在 Azure 门户创建语音服务资源",
         "items": {
           "instance_name": {
             "description": "实例名称（用于标识和切换）",
             "type": "string",
             "default": "azure_tts"
+          },
+          "timeout": {
+            "description": "超时（秒）",
+            "type": "int",
+            "default": 60,
+            "invisible": true
+          },
+          "style": {
+            "description": "情感风格",
+            "type": "string",
+            "default": "",
+            "hint": "cheerful、sad、gentle 等"
           },
           "subscription_key": {
             "description": "订阅密钥",
@@ -842,27 +848,16 @@
             "type": "string",
             "default": "audio-16khz-128kbitrate-mono-mp3"
           },
-          "style": {
-            "description": "情感风格",
-            "type": "string",
-            "default": "",
-            "hint": "cheerful、sad、gentle 等"
-          },
           "role": {
             "description": "角色扮演",
             "type": "string",
             "default": ""
-          },
-          "timeout": {
-            "description": "超时（秒）",
-            "type": "int",
-            "default": 60,
-            "invisible": true
           }
-        }
+        },
+        "description": "SSML + 情感风格"
       },
       "elevenlabs": {
-        "name": "[ElevenLabs] TTS（多语言高质量语音）",
+        "name": "[ElevenLabs] TTS",
         "hint": "需在 ElevenLabs 获取 API Key 和 Voice ID",
         "items": {
           "instance_name": {
@@ -875,6 +870,12 @@
             "type": "string",
             "default": "",
             "secret": true
+          },
+          "timeout": {
+            "description": "超时（秒）",
+            "type": "int",
+            "default": 30,
+            "invisible": true
           },
           "voice_id": {
             "description": "Voice ID",
@@ -917,23 +918,30 @@
               "pcm_24000",
               "pcm_44100"
             ]
-          },
-          "timeout": {
-            "description": "超时（秒）",
-            "type": "int",
-            "default": 30,
-            "invisible": true
           }
-        }
+        },
+        "description": "多语言高保真"
       },
       "custom_http": {
-        "name": "[自定义] HTTP TTS（模板化接入任意 API）",
+        "name": "[自定义] HTTP",
         "hint": "占位符: ${TEXT}、${TEXT_JSON}、${API_KEY}、${VOICE_SAMPLE_BASE64}、${VOICE_SAMPLE_BASE64_RAW}、${VOICE_SAMPLE_PATH}",
         "items": {
           "instance_name": {
             "description": "实例名称（用于标识和切换）",
             "type": "string",
             "default": "custom_tts"
+          },
+          "api_key": {
+            "description": "API Key",
+            "type": "string",
+            "default": "",
+            "secret": true
+          },
+          "timeout": {
+            "description": "超时（秒）",
+            "type": "int",
+            "default": 30,
+            "invisible": true
           },
           "url": {
             "description": "请求 URL",
@@ -997,33 +1005,201 @@
             "type": "string",
             "default": "wav"
           },
-          "api_key": {
-            "description": "API Key",
-            "type": "string",
-            "default": "",
-            "secret": true
-          },
           "voice_sample_name": {
             "description": "音色样本文件名",
             "type": "string",
             "default": ""
+          }
+        },
+        "description": "模板化接入任意 API"
+      },
+      "minimax": {
+        "name": "[MiniMax] 语音+音乐",
+        "description": "朗读可用 · 唱歌需老账号",
+        "items": {
+          "instance_name": {
+            "description": "实例名称（用于标识和切换）",
+            "type": "string",
+            "default": "minimax"
+          },
+          "api_key": {
+            "description": "API Key",
+            "type": "string",
+            "default": "",
+            "obscure": true
+          },
+          "api_base": {
+            "description": "API Base URL",
+            "type": "string",
+            "default": "https://api.minimax.chat",
+            "hint": "国内站 https://api.minimax.chat；国际站 https://api.minimax.io。"
+          },
+          "model": {
+            "description": "朗读模型",
+            "type": "string",
+            "default": "speech-02-hd",
+            "options": [
+              "speech-02-hd",
+              "speech-02-turbo",
+              "speech-01-turbo",
+              "speech-01-http"
+            ]
+          },
+          "voice": {
+            "description": "朗读音色",
+            "type": "string",
+            "default": "少女（清亮，推荐）",
+            "options": [
+              "少女（清亮，推荐）",
+              "御姐（成熟磁性）",
+              "成熟女性（沉稳）",
+              "甜美女性（软糯）",
+              "青涩青年（男·少年感）",
+              "精英青年（男·干练）",
+              "霸道青年（男·低音）",
+              "青年大学生（男·自然）",
+              "男性主持人（播音腔）",
+              "女性主持人（播音腔）",
+              "男性有声书1（叙述感）",
+              "女性有声书1（叙述感）",
+              "聪明男童",
+              "可爱男童",
+              "萌萌女童",
+              "病娇弟弟",
+              "俊朗男友",
+              "纯真学弟",
+              "冷淡学长",
+              "霸道少爷",
+              "甜心小玲",
+              "俏皮萌妹",
+              "妩媚御姐",
+              "嗲嗲学妹",
+              "淡雅学姐"
+            ],
+            "hint": "按听感选了中文名，插件会自动换成 MiniMax 的 voice_id。如果控制台里还有别的 voice_id，直接填那串英文也行。"
+          },
+          "format": {
+            "description": "朗读输出格式",
+            "type": "string",
+            "default": "mp3",
+            "options": [
+              "mp3",
+              "wav",
+              "flac",
+              "pcm"
+            ]
           },
           "timeout": {
-            "description": "超时（秒）",
+            "description": "朗读超时（秒）",
             "type": "int",
-            "default": 30,
-            "invisible": true
+            "default": 60
+          },
+          "music_model": {
+            "description": "唱歌模型",
+            "type": "string",
+            "default": "music-3.0",
+            "options": [
+              "music-3.0",
+              "music-2.6",
+              "music-01"
+            ]
+          },
+          "music_prompt": {
+            "description": "唱歌风格描述",
+            "type": "text",
+            "default": "华语流行，抒情，女声，中速，温暖",
+            "hint": "喂给音乐模型的曲风/情绪/场景描述，直接决定唱成什么样。例：摇滚，男声，快节奏，激昂 / 民谣，木吉他，女声，舒缓 / 电子，空灵，中速。"
+          },
+          "music_format": {
+            "description": "唱歌输出格式",
+            "type": "string",
+            "default": "mp3",
+            "options": [
+              "mp3",
+              "wav"
+            ]
+          },
+          "music_sample_rate": {
+            "description": "唱歌采样率",
+            "type": "int",
+            "default": 44100,
+            "options": [
+              44100,
+              32000,
+              24000
+            ]
+          },
+          "music_bitrate": {
+            "description": "唱歌比特率",
+            "type": "int",
+            "default": 256000
+          },
+          "music_timeout": {
+            "description": "唱歌超时（秒）",
+            "type": "int",
+            "default": 180,
+            "hint": "音乐生成比语音慢得多，通常 30~90 秒，留足余量。"
+          },
+          "emotion": {
+            "description": "朗读情绪",
+            "type": "string",
+            "default": "不设置",
+            "options": [
+              "不设置",
+              "开心",
+              "悲伤",
+              "愤怒",
+              "害怕",
+              "厌恶",
+              "惊讶",
+              "平静"
+            ],
+            "hint": "「不设置」时会尝试从人设语气自动推断。"
+          },
+          "speed": {
+            "description": "语速",
+            "type": "float",
+            "default": 1.0
+          },
+          "vol": {
+            "description": "音量",
+            "type": "float",
+            "default": 1.0
+          },
+          "pitch": {
+            "description": "音高（整数）",
+            "type": "int",
+            "default": 0
           }
         }
       }
     },
-    "hint": "至少配一个。要唱歌必须用 [MiMo] V2.5-TTS（预置音色），VoiceDesign / VoiceClone 不支持唱歌。"
+    "hint": "至少配一个。可以加多个实例自由组合：例如 MiMo 负责日常对话、MiniMax 负责唱歌，由上面②③两项分别指定。要唱歌必须至少有一个支持唱歌的引擎（MiMo V2.5-TTS、MiniMax；VoiceDesign / VoiceClone 不支持）。"
   },
   "singing_enable": {
-    "description": "③ 允许唱歌",
+    "description": "④ 允许唱歌",
     "type": "bool",
     "default": true,
-    "hint": "关掉后 /tts_sing 与自动唱歌都失效，普通朗读不受影响。"
+    "hint": "关掉后 /tts_sing 与自动唱歌都失效，普通朗读不受影响。所有会话共用这一项。"
+  },
+  "singing_resident_mode": {
+    "description": "③b 常驻唱歌（任何唱歌引擎通用）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后不靠关键词，直接把模型的普通回复当歌词唱。对所有支持唱歌的引擎生效，不限 MiMo。歌名、闲聊也会被唱，日常建议关闭。"
+  },
+  "singing_speed": {
+    "description": "③c 演唱速度（任何唱歌引擎通用）",
+    "type": "string",
+    "default": "正常",
+    "options": [
+      "很慢",
+      "偏慢",
+      "正常",
+      "偏快",
+      "很快"
+    ],
+    "hint": "影响演唱的松紧感。选「正常」以外的档位时，插件会把它写进演唱指令，让模型按这个速度唱。"
   },
   "singing_length_preset": {
     "description": "唱多久",
@@ -1075,7 +1251,7 @@
     "hint": "24 小时制，如 23:30-07:00；多段用逗号分隔（23:30-07:00,12:00-13:30）。留空表示不限。"
   },
   "tts_probability": {
-    "description": "④ 语音概率（%）",
+    "description": "⑤ 语音概率（%）",
     "type": "int",
     "default": 100,
     "hint": "每条回复转成语音的概率。100 表示全部转语音，0 等于关掉自动 TTS。唱歌不受此限制。",
@@ -1086,7 +1262,7 @@
     }
   },
   "admin_only_commands": {
-    "description": "⑤ 管理命令仅管理员",
+    "description": "⑥ 管理命令仅管理员",
     "type": "bool",
     "default": true,
     "hint": "关闭后任何人都能切换全局引擎、清除绑定、改字数上限。"

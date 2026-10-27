@@ -156,6 +156,92 @@ function renderHeader(state) {
   // 按钮只表达「动作」，统一与否由徽章表达；文案恒定，避免长度跳动
 }
 
+/* 引擎卡片：点一下切换，不用回配置页打字 */
+function renderEngines(state) {
+  const box = state && state.engine_choices;
+  const note = $("engine-note");
+  const speechBox = $("speech-cards");
+  const singingBox = $("singing-cards");
+  if (!box || !speechBox || !singingBox) return;
+
+  const cards = Array.isArray(box.cards) ? box.cards : [];
+  const speechNow = box.speech || "";
+  const singingNow = box.singing || "";
+  const followLabel = "跟随朗读引擎";
+
+  if (!cards.length) {
+    speechBox.innerHTML = "";
+    singingBox.innerHTML = "";
+    if (note) note.textContent = "还没有配置引擎";
+    return;
+  }
+
+  const singable = cards.filter((c) => c.can_sing).length;
+  if (note) {
+    note.textContent = singingNow && singingNow !== followLabel
+      ? `说话 ${speechNow} · 唱歌 ${singingNow}`
+      : `说话与唱歌都用 ${speechNow}`;
+  }
+
+  const makeCard = (value, label, opts) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "engine-card";
+    btn.textContent = label;
+    btn.setAttribute("role", "radio");
+    btn.dataset.value = value;
+    btn.dataset.kind = opts.kind;
+
+    if (opts.disabled) {
+      btn.disabled = true;
+      if (opts.reason) btn.title = opts.reason;
+    }
+    if (opts.icon) {
+      const tag = document.createElement("span");
+      tag.className = "engine-tag";
+      tag.textContent = opts.icon;
+      btn.appendChild(tag);
+    }
+
+    const checked = opts.checked;
+    btn.setAttribute("aria-checked", checked ? "true" : "false");
+    return btn;
+  };
+
+  // 说话：所有引擎都能当朗读引擎
+  speechBox.innerHTML = "";
+  for (const card of cards) {
+    speechBox.appendChild(
+      makeCard(card.name, card.name, {
+        kind: "speech",
+        checked: card.name === speechNow,
+        icon: card.can_sing ? "可唱" : "",
+      })
+    );
+  }
+
+  // 唱歌：不支持唱歌的灰掉，并说明原因
+  singingBox.innerHTML = "";
+  singingBox.appendChild(
+    makeCard(followLabel, followLabel, {
+      kind: "singing",
+      checked: !singingNow || singingNow === followLabel,
+      icon: "",
+    })
+  );
+  for (const card of cards) {
+    singingBox.appendChild(
+      makeCard(card.name, card.name, {
+        kind: "singing",
+        checked: singingNow === card.name,
+        disabled: !card.can_sing,
+        reason: card.reason || "该引擎不支持唱歌",
+        icon: card.can_sing ? "可唱" : "",
+      })
+    );
+  }
+}
+
 function renderFacts(state) {
   const eff = state.effective || {};
   const engine = state.engine || {};
@@ -254,6 +340,7 @@ function render(state) {
   renderHeader(state);
   renderHero(state);
   renderFacts(state);
+  renderEngines(state);
   fillForm(state.config || {});
   $("split-group").hidden = Boolean(state.unified_mode);
 
@@ -381,7 +468,28 @@ function toggleDrawer(which) {
 
 /* ---------------- 事件 ---------------- */
 
+/* 引擎卡片点击 */
+function bindEngineEvents() {
+  for (const id of ["speech-cards", "singing-cards"]) {
+    const box = $(id);
+    if (!box) continue;
+    box.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".engine-card");
+      if (!btn || btn.disabled) return;
+      const kind = btn.dataset.kind;
+      const value = btn.dataset.value;
+      queue(kind === "speech" ? { active_engine: value } : { singing_engine: value });
+      // 立即在界面上反映选中态，等后端回执再校正
+      box.querySelectorAll(".engine-card").forEach((el) => {
+        el.setAttribute("aria-checked", el === btn ? "true" : "false");
+      });
+    });
+  }
+}
+
 function bindEvents() {
+  bindEngineEvents();
+
   for (const button of document.querySelectorAll("[data-preset]")) {
     button.addEventListener("click", () => {
       queue({ singing_length_preset: button.dataset.preset }, 0);

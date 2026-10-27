@@ -14,6 +14,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 
 from .engines import (
+    ENGINE_REGISTRY,
     get_engine,
     TTSEngine,
     SINGING_TEMPLATE_KEYS,
@@ -44,6 +45,11 @@ except Exception:  # noqa: BLE001
 
 
 DISABLED_ENGINE = "__disabled__"
+
+#: singing_engine 里表示「跟随朗读引擎」的取值（界面下拉的第一项）
+_FOLLOW_ENGINE_VALUES = frozenset(
+    {"", "跟随朗读引擎", "跟随", "follow", "same", "default"}
+)
 
 #: 插件版本，供 /tts_doctor 自检显示（与 metadata.yaml 保持一致）
 PLUGIN_VERSION = "4.6.0"
@@ -140,12 +146,25 @@ WEB_EDITABLE_BOOL_KEYS = frozenset(
 )
 #: 浮点键：每秒钟唱多少字。0 表示由插件实测自动校准。
 WEB_EDITABLE_FLOAT_KEYS = frozenset({"singing_chars_per_second"})
+#: 真正需要「时段格式校验」的键。其他字符串键（引擎名、预设名）不该走这套校验，
+#: 否则「跟随朗读引擎」会被当成时间范围解析，报「时段格式不对」。
+QUIET_HOUR_KEYS = frozenset(
+    {
+        "singing_quiet_hours",
+        "singing_quiet_hours_private",
+        "singing_quiet_hours_group",
+    }
+)
+
 WEB_EDITABLE_STR_KEYS = frozenset(
     {
         "singing_quiet_hours",
         "singing_quiet_hours_private",
         "singing_quiet_hours_group",
         "singing_length_preset",
+        # 面板上可以点选朗读/唱歌引擎，不用回配置页手打实例名
+        "active_engine",
+        "singing_engine",
     }
 )
 WEB_EDITABLE_KEYS = (
@@ -732,6 +751,73 @@ class QingYuPlugin(Star):
                 self._save_bindings()
         return self._engine
 
+    def _apply_top_singing_switches(self, engine) -> None:
+        """把顶层的「常驻唱歌」「演唱速度」写进引擎实例。
+
+        这两项以前是 MiMo 实例的私有配置，换别的唱歌引擎就没有。
+        现在放在插件顶层，任何引擎都能拿到。
+        """
+        if engine is None:
+            return
+        try:
+            engine.singing_mode = bool(self.config.get("singing_resident_mode", False))
+        except Exception:  # noqa: BLE001 - 个别引擎不允许写属性
+            pass
+
+        speed = _as_str(self.config.get("singing_speed")).strip() or "正常"
+        try:
+            engine.singing_speed = speed
+        except Exception:  # noqa: BLE001
+            pass
+        # MiMo 两个引擎用 speed_hint 拼进演唱指令，这里一并同步
+        try:
+            engine.speed_hint = "" if speed == "正常" else speed
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _get_singing_engine(self, session_id: str, speech_engine):
+        """唱歌用的引擎。
+
+        与朗读引擎完全独立：
+          - 配置里 singing_engine 留空 / 「跟随朗读引擎」→ 用朗读引擎
+          - 填了其他实例名 → 用那个实例，朗读不受影响
+
+        所以可以「MiMo 说话 + MiniMax 唱歌」，也可以反过来。
+        目标引擎不支持唱歌时回退朗读引擎，并给出可读的原因。
+        """
+        raw = _as_str(self.config.get("singing_engine")).strip()
+        if not raw or raw in _FOLLOW_ENGINE_VALUES:
+            return speech_engine
+
+        engine = self._cached_engines.get(raw)
+        if engine is None:
+            cfg = self._find_engine_config(raw)
+            if cfg is None:
+                logger.warning(
+                    "[情语] 唱歌引擎 '%s' 不存在，本次改用朗读引擎 %s",
+                    raw,
+                    getattr(speech_engine, "instance_name", "?"),
+                )
+                return speech_engine
+            try:
+                engine = get_engine(cfg, self.config)
+                self._cached_engines[raw] = engine
+            except Exception as e:  # noqa: BLE001
+                logger.error("[情语] 唱歌引擎 '%s' 创建失败: %s，回退朗读引擎", raw, e)
+                return speech_engine
+
+        if not getattr(engine, "SUPPORTS_SINGING", False):
+            reason = getattr(engine, "SINGING_UNSUPPORTED_REASON", "该引擎不支持唱歌")
+            logger.warning(
+                "[情语] 唱歌引擎 %s 不可用（%s），本次改用朗读引擎 %s",
+                raw,
+                reason,
+                getattr(speech_engine, "instance_name", "?"),
+            )
+            return speech_engine
+
+        return engine
+
     # ---------- 唱歌模式 ----------
 
     def _singing_enabled(self) -> bool:
@@ -964,6 +1050,7 @@ class QingYuPlugin(Star):
 
     def _singing_mode_label(self, engine: TTSEngine | None) -> str:
         """当前实例实际走哪条唱歌链路，用于诊断「同一个引擎为什么时长不一样」。"""
+        # 「参考项目写法」模式已下线；这里恒为 False，保留分支只为兼容旧实例
         if getattr(engine, "singing_reference_mode", False):
             return "参考(不裁)"
         if getattr(engine, "singing_legacy_mode", False):
@@ -1225,13 +1312,18 @@ class QingYuPlugin(Star):
             )
         return lines
 
-    async def _speech_tone(self, event: AstrMessageEvent) -> str:
-        """生成朗读语气，贴合 AstrBot 里用户自己的人设（唱歌不用，保持官方原版）。"""
+    async def _speech_tone(self, event: AstrMessageEvent, text: str = "") -> str:
+        """生成朗读语气。
+
+        优先级：人设里的声音特征 → 回复内容本身 → 通用自然语气。
+        不限定角色类型：任何人设、以及完全没有设人设的场合，都能给出一句合适的语气。
+        唱歌链路不用它，保持官方原版。
+        """
         if not bool(self.config.get("voice_tone_enable", False)):
             # 默认关闭：纯语音与项目原始实现完全一致，不做任何语气处理
             return ""
         persona = await self._persona_text(event)
-        return build_speech_tone(extract_persona_traits(persona))
+        return build_speech_tone(extract_persona_traits(persona), text)
 
     async def initialize(self):
         """插件初始化：创建引擎实例"""
@@ -1380,6 +1472,18 @@ class QingYuPlugin(Star):
             tail_text = ""
             logger.info("[情语] 引擎处于常驻唱歌模式，本条回复按唱歌合成")
 
+        # 唱歌走独立的引擎：可以不与朗读同源
+        if singing:
+            singing_engine = self._get_singing_engine(session_id, engine)
+            self._apply_top_singing_switches(singing_engine)
+            if singing_engine is not engine:
+                logger.info(
+                    "[情语] 唱歌使用独立引擎：%s（朗读仍是 %s）",
+                    getattr(singing_engine, "instance_name", "?"),
+                    getattr(engine, "instance_name", "?"),
+                )
+                engine = singing_engine
+
         if singing and not self._supports_singing(engine):
             reason = getattr(engine, "SINGING_UNSUPPORTED_REASON", "当前引擎不支持唱歌模式")
             logger.warning(f"[情语] {reason}，已回退普通语音合成")
@@ -1468,7 +1572,7 @@ class QingYuPlugin(Star):
         # 唱歌链路彻底不读它，避免两边互相影响
         if not singing:
             try:
-                engine.voice_tone = await self._speech_tone(event)
+                engine.voice_tone = await self._speech_tone(event, speak_text)
             except Exception as e:  # noqa: BLE001 - 第三方引擎可能不允许写属性
                 logger.debug(f"[情语] 注入语气失败: {e}")
             logger.debug(
@@ -2581,7 +2685,10 @@ class QingYuPlugin(Star):
                 )
             return round(number, 2)
         text = str(value or "").strip()
-        if text:
+        # 只有时段类键才做时间格式校验。
+        # 之前这里对所有字符串键都跑一遍，结果 singing_engine 填「跟随朗读引擎」
+        # 被当成时间范围解析，报「时段格式不对」。
+        if key in QUIET_HOUR_KEYS and text:
             _, bad = _parse_quiet_windows(text)
             if bad:
                 raise ValueError(
@@ -2754,6 +2861,32 @@ class QingYuPlugin(Star):
 
         engine = self._engine
         cps = self._singing_cps()
+
+        # 引擎卡片清单：面板据此渲染「点一下换引擎」的图形选择器。
+        # 只看模板类的能力声明，不实例化引擎——避免面板每刷新一次就建一堆对象。
+        engine_cards: list[dict] = []
+        for idx, cfg in enumerate(self._list_engines(), start=1):
+            name = _as_str(cfg.get("instance_name")) or _as_str(cfg.get("__template_key"))
+            template = _as_str(cfg.get("__template_key"))
+            cls = ENGINE_REGISTRY.get(template)
+            can_sing = bool(getattr(cls, "SUPPORTS_SINGING", False)) if cls else False
+            engine_cards.append(
+                {
+                    "index": idx,
+                    "name": name,
+                    "template": template,
+                    "can_sing": can_sing,
+                    "reason": (
+                        ""
+                        if can_sing
+                        else (getattr(cls, "SINGING_UNSUPPORTED_REASON", "") if cls else "未知模板")
+                    ),
+                }
+            )
+        current_speech = _as_str(self.config.get("active_engine")).strip()
+        if not current_speech and engine_cards:
+            current_speech = engine_cards[0]["name"]
+        current_singing = _as_str(self.config.get("singing_engine")).strip()
         calibration = dict(self._calibration or {})
         bindings = self._binding_report()
         divergent = [b for b in bindings if not b["same_as_global"]]
@@ -2790,6 +2923,11 @@ class QingYuPlugin(Star):
                 "last_measured": calibration.get("last_measured"),
                 "last_chars": calibration.get("last_chars"),
                 "last_seconds": calibration.get("last_seconds"),
+            },
+            "engine_choices": {
+                "cards": engine_cards,
+                "speech": current_speech,
+                "singing": current_singing,
             },
             "engine": {
                 "name": getattr(engine, "instance_name", "") if engine else "",
@@ -3022,6 +3160,49 @@ class QingYuPlugin(Star):
 
     # ---------- 自检 ----------
 
+    def _segmented_reply_state(self) -> tuple[bool, str]:
+        """读 AstrBot 的分段回复设置，判断会不会把语音切碎。
+
+        分段回复把一条 LLM 回复拆成多条消息发出去。TTS 是在单条消息的结果上触发的，
+        所以一旦被拆开，就会变成「好几条短语音」而不是一整段。
+
+        返回值：(是否开启, 说明文字)。读不到就返回 (False, "")，不瞎猜。
+        """
+        reader = getattr(self.context, "get_config", None)
+        if not callable(reader):
+            return False, ""
+        try:
+            cfg = reader()
+        except Exception:  # noqa: BLE001
+            return False, ""
+        if not isinstance(cfg, dict):
+            return False, ""
+
+        # 配置里可能叫 segmented_reply / segmented / segmented_reply_settings，
+        # 用宽松匹配找，找不到就认为没开。
+        def dig(node, depth=0):
+            if depth > 4 or not isinstance(node, dict):
+                return None
+            for key, value in node.items():
+                low = str(key).lower()
+                if "segment" in low:
+                    if isinstance(value, bool):
+                        return value
+                    if isinstance(value, dict):
+                        for inner in ("enable", "enabled", "on"):
+                            if inner in value:
+                                return bool(value[inner])
+                        return None
+                found = dig(value, depth + 1)
+                if found is not None:
+                    return found
+            return None
+
+        state = dig(cfg)
+        if state is None:
+            return False, ""
+        return bool(state), "AstrBot 的「分段回复」已开启"
+
     def _self_check(self) -> tuple[list[str], bool]:
         """一次检查完所有依赖项，回答「为什么某个功能用不了」。
 
@@ -3049,6 +3230,18 @@ class QingYuPlugin(Star):
                 reason = getattr(engine, "SINGING_UNSUPPORTED_REASON", "当前模型不支持唱歌")
                 problems.append(f"唱歌不可用：{reason}")
                 lines.append(f"唱歌　 不可用 {MARK_BAD}（{reason}）")
+
+        # 分段回复会把一条回复拆成多条消息，TTS 只拿到其中一段，语音就被切碎。
+        segmented, _seg_note = self._segmented_reply_state()
+        if segmented:
+            lines.append(f"分段　 已开启 {MARK_BAD}（语音会被切成多段）")
+            problems.append(
+                "AstrBot 开启了「分段回复」：一条回复被拆成多条消息，"
+                "语音也会跟着变成好几段。想让语音连贯，"
+                "去 AstrBot 配置里关掉「分段回复 → 启用分段回复」"
+            )
+        else:
+            lines.append(f"分段　 未开启 {MARK_OK}")
 
         hook_prompt = bool(HOOK_REGISTRY.get("on_llm_request"))
         hook_web = bool(HOOK_REGISTRY.get("web_api"))
