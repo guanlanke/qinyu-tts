@@ -751,6 +751,47 @@ class QingYuPlugin(Star):
                 self._save_bindings()
         return self._engine
 
+    def _sync_engine_voice(self, engine) -> None:
+        """把配置里的音色同步到引擎实例。
+
+        引擎对象在构造时把 `voice` / `singing_voice` 抄成属性，之后改配置页不会
+        自动同步——必须重载插件才生效。用户体感就是「音色切换不了、选了男声出来女声」。
+
+        这里在每次合成前对齐一次：配置是唯一事实来源，实例跟着配置走。
+        只同步音色这类「改了应当立刻生效」的字段，不碰引擎内部状态。
+        """
+        if engine is None:
+            return
+        name = getattr(engine, "instance_name", "")
+        cfg = self._find_engine_config(name) if name else None
+        if not isinstance(cfg, dict):
+            return
+
+        for attr, key in (
+            ("voice", "voice"),
+            ("singing_voice", "singing_voice"),
+            ("audio_format", "format"),
+            ("style_prompt", "style_prompt"),
+        ):
+            if key not in cfg:
+                continue
+            value = cfg.get(key)
+            if value is None:
+                continue
+            try:
+                current = getattr(engine, attr, None)
+                if current != value:
+                    setattr(engine, attr, value)
+                    logger.info(
+                        "[情语] 同步引擎配置 %s.%s: %r -> %r",
+                        name,
+                        attr,
+                        current,
+                        value,
+                    )
+            except Exception:  # noqa: BLE001 - 个别引擎不允许写属性
+                pass
+
     def _apply_top_singing_switches(self, engine) -> None:
         """把顶层的「常驻唱歌」「演唱速度」写进引擎实例。
 
@@ -1483,6 +1524,10 @@ class QingYuPlugin(Star):
         # 配置的引擎没起来时，_get_engine_for_session 会悄悄退回全局引擎。
         # 对克隆音色来说那是致命的：用户听到的是另一个人的声音，还不知道为什么。
         # 这里直接拦下来，改用文字，绝不换音色。
+        # 合成前把音色对齐配置，改完配置页立即生效，不必重载插件
+        if engine is not None:
+            self._sync_engine_voice(engine)
+
         if not singing and engine is not None:
             configured_name = _as_str(self.config.get("active_engine")).strip()
             actual_name = getattr(engine, "instance_name", "")
