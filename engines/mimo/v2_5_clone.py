@@ -27,7 +27,9 @@ class MiMoV25CloneEngine(TTSEngine):
         self.model: str = config.get("model", "mimo-v2.5-tts-voiceclone")
         self.audio_format: str = config.get("format", "wav")
         self.style_prompt: str = config.get("style_prompt", "")
-        self.timeout: int = config.get("timeout", 60)
+        # VoiceClone 每次都要把样本转成 base64 一起发上去，比预置音色慢得多。
+        # 60 秒容易踩线超时，默认给 120 秒；超时后由主程序降级成文字，不换音色。
+        self.timeout: int = int(config.get("timeout") or 120)
         self._client: httpx.AsyncClient | None = None
         self._voice_base64: str | None = None
         self._sample_paths: list[str] = self.plugin_config.get("voice_clone_samples", [])

@@ -570,8 +570,8 @@
           "timeout": {
             "description": "超时（秒）",
             "type": "int",
-            "default": 60,
-            "invisible": true
+            "default": 120,
+            "hint": "克隆音色合成比预置音色慢（每次都要上传样本），建议 120 秒以上。超时后本次改为发文字，**不会**换成别的音色念。"
           },
           "style_prompt": {
             "description": "风格指令（可选）",

@@ -8,7 +8,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue?style=flat-square)](https://github.com/AstrBotDevs/AstrBot)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.2.6-orange?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.2.7-orange?style=flat-square)]()
 
 </div>
 

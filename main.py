@@ -1480,6 +1480,26 @@ class QingYuPlugin(Star):
             tail_text = ""
             logger.info("[情语] 引擎处于常驻唱歌模式，本条回复按唱歌合成")
 
+        # 配置的引擎没起来时，_get_engine_for_session 会悄悄退回全局引擎。
+        # 对克隆音色来说那是致命的：用户听到的是另一个人的声音，还不知道为什么。
+        # 这里直接拦下来，改用文字，绝不换音色。
+        if not singing and engine is not None:
+            configured_name = _as_str(self.config.get("active_engine")).strip()
+            actual_name = getattr(engine, "instance_name", "")
+            if (
+                configured_name
+                and configured_name not in (DISABLED_ENGINE, *_FOLLOW_ENGINE_VALUES)
+                and actual_name
+                and actual_name != configured_name
+            ):
+                logger.warning(
+                    "[情语] 朗读引擎降级：配置是 %s，实际拿到 %s。"
+                    "为避免用别的音色念出来，本次改发文字。请 /tts_doctor 检查该引擎为何没起来",
+                    configured_name,
+                    actual_name,
+                )
+                return
+
         # 唱歌走独立的引擎：可以不与朗读同源
         if singing:
             singing_engine = self._get_singing_engine(session_id, engine)
@@ -1618,16 +1638,25 @@ class QingYuPlugin(Star):
                 f"[情语] TTS 合成失败 (引擎: {engine.instance_name}): "
                 f"{type(e).__name__}: {e}"
             )
-            if singing:
-                # 失败也不能把 <sing> 标签或（叹气）这类残留当正文发出去，
-                # 否则用户看到的是乱码而不是歌词，会以为唱歌功能坏了
+            # 失败一律退回文字，而且**只留一条文字**。
+            # 之前只有唱歌分支做了清理，普通朗读失败时 chain 里还是原来那几个组件，
+            # 分段回复会把它逐条发出去，看起来就像「语音被切成好几段」。
+            fallback_text = (
+                (sing_text or "（这段没唱出来，稍后再试）")
+                if singing
+                else (full_text or "")
+            )
+            if bool(self.config.get("tts_single_message", True)):
+                result.chain = [Comp.Plain(fallback_text)] if fallback_text else []
+            elif singing:
+                # 关掉「单条语音」时保持老行为：歌词替换掉原来的 Plain
                 new_chain: list = []
                 inserted = False
                 for component in result.chain:
                     if isinstance(component, Comp.Plain):
                         if not inserted:
                             new_chain.append(
-                                Comp.Plain(sing_text or "（这段没唱出来，稍后再试）")
+                                Comp.Plain(fallback_text or "（这段没唱出来，稍后再试）")
                             )
                             inserted = True
                         continue
