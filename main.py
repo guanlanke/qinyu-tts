@@ -515,6 +515,7 @@ class QingYuPlugin(Star):
         self._last_sing_any: dict = {}  # 最近一次唱歌（跨会话，供 WebUI 面板展示）
         self._tts_audio_text: dict[str, str] = {}  # audio_path -> TTS 文本（用于引用还原）
         self._last_temp_cleanup_at = 0.0
+        self._config_drift: list[str] = []  # 启动时发现的配置重置
         self._temp_dir = Path("data") / "temp" / "qinyu"
         self._temp_dir.mkdir(parents=True, exist_ok=True)
         self._data_dir = Path("data") / "plugin_data" / "astrbot_plugin_qinyu"
@@ -750,6 +751,119 @@ class QingYuPlugin(Star):
                 del self._session_bindings[session_id]
                 self._save_bindings()
         return self._engine
+
+    #: 值得盯住的配置项。这些一旦被重置，用户能直接听出来（音色变了、语音分段了）
+    SNAPSHOT_KEYS = (
+        "active_engine",
+        "singing_engine",
+        "tts_single_message",
+        "singing_resident_mode",
+        "singing_speed",
+        "singing_length_preset",
+        "voice_tone_enable",
+    )
+
+    def _snapshot_file(self) -> Path:
+        return self._data_dir / "config_snapshot.json"
+
+    def _collect_config_fingerprint(self) -> dict:
+        """收集「当前实际生效」的关键配置，含每个引擎实例的音色。"""
+        data: dict = {}
+        for key in self.SNAPSHOT_KEYS:
+            if key in self.config:
+                data[key] = self.config.get(key)
+        engines = {}
+        for cfg in self._list_engines():
+            name = _as_str(cfg.get("instance_name")) or _as_str(cfg.get("__template_key"))
+            engines[name] = {
+                "voice": cfg.get("voice"),
+                "singing_voice": cfg.get("singing_voice"),
+                "format": cfg.get("format"),
+                "__template_key": cfg.get("__template_key"),
+            }
+        data["__engines__"] = engines
+        return data
+
+    def _save_config_snapshot(self) -> None:
+        """把当前配置存成快照。只保存，不恢复。"""
+        try:
+            import json as _json
+
+            self._snapshot_file().write_text(
+                _json.dumps(self._collect_config_fingerprint(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug("[情语] 写配置快照失败: %s", e)
+
+    def _check_config_drift(self) -> list[str]:
+        """启动时对比快照，找出被重置的关键项。
+
+        只报告，不自动改——用户可能是有意改回默认值的。
+        """
+        import json as _json
+
+        path = self._snapshot_file()
+        if not path.exists():
+            self._save_config_snapshot()
+            return []
+        try:
+            old = _json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return []
+        if not isinstance(old, dict):
+            return []
+
+        now = self._collect_config_fingerprint()
+        drift: list[str] = []
+        for key in self.SNAPSHOT_KEYS:
+            if key in old and key in now and old[key] != now[key]:
+                drift.append(f"{key}: {old[key]!r} → {now[key]!r}")
+
+        old_engines = old.get("__engines__") or {}
+        new_engines = now.get("__engines__") or {}
+        for name, fields in old_engines.items():
+            current = new_engines.get(name)
+            if not isinstance(current, dict) or not isinstance(fields, dict):
+                continue
+            for field in ("voice", "singing_voice"):
+                before, after = fields.get(field), current.get(field)
+                if before and before != after:
+                    drift.append(f"{name}.{field}: {before!r} → {after!r}")
+        return drift
+
+    async def _restore_config_snapshot(self) -> bool:
+        """把快照里的值写回当前配置并持久化。"""
+        import json as _json
+
+        path = self._snapshot_file()
+        if not path.exists():
+            return False
+        try:
+            old = _json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return False
+        if not isinstance(old, dict):
+            return False
+
+        for key in self.SNAPSHOT_KEYS:
+            if key in old:
+                self.config[key] = old[key]
+
+        old_engines = old.get("__engines__") or {}
+        for cfg in self._list_engines():
+            name = _as_str(cfg.get("instance_name")) or _as_str(cfg.get("__template_key"))
+            saved = old_engines.get(name)
+            if not isinstance(saved, dict):
+                continue
+            for field in ("voice", "singing_voice"):
+                if saved.get(field):
+                    cfg[field] = saved[field]
+
+        await self._persist_config()
+        await self._rebuild_engines()
+        self._save_config_snapshot()
+        return True
 
     def _sync_engine_voice(self, engine) -> None:
         """把配置里的音色同步到引擎实例。
@@ -1380,6 +1494,20 @@ class QingYuPlugin(Star):
             logger.info("[情语] 插件已禁用，跳过初始化")
             return
 
+        # 配置漂移检测：插件更新过 schema 后，AstrBot 可能按新默认值重生成配置，
+        # 用户改过的音色会悄悄回到默认（冰糖=女声）。这里把差异摆出来。
+        try:
+            drift = self._check_config_drift()
+            if drift:
+                logger.warning(
+                    "[情语] 检测到配置被重置（可能与插件更新有关）：%s。"
+                    "发 /tts_restore 可恢复上次的值",
+                    "；".join(drift),
+                )
+                self._config_drift = drift
+        except Exception as e:  # noqa: BLE001
+            logger.debug("[情语] 配置漂移检测失败: %s", e)
+
         # 加载会话绑定
         self._load_bindings()
         self._load_runtime_state()
@@ -1428,6 +1556,20 @@ class QingYuPlugin(Star):
             return
 
         logger.info(f"[情语] 已启用，全局引擎: {instance_name} (类型: {template_key})")
+        # 记录当前生效配置，供下次启动比对
+        self._save_config_snapshot()
+        # 把实际音色打进日志：出问题时一眼看出「配置读到的是什么」
+        try:
+            _v = getattr(self._engine, "voice", "")
+            _sv = getattr(self._engine, "singing_voice", "")
+            logger.info(
+                "[情语] 音色生效：朗读=%s 唱歌=%s 单条语音=%s",
+                _v or "(未设)",
+                _sv or "跟随朗读",
+                "开" if bool(self.config.get("tts_single_message", True)) else "关",
+            )
+        except Exception:  # noqa: BLE001
+            pass
         # 打印实际生效的唱歌配置，便于排查「关键词没生效 / 时长没变」
         keywords = self._singing_keywords()
         target_chars, hard_chars, _ = self._singing_budget()
@@ -2463,6 +2605,32 @@ class QingYuPlugin(Star):
             lines.append("            想让它生效：发 /tts_unify 关掉统一模式，或直接 /tts_set 对应项。")
         yield event.plain_result("\n".join(lines))
 
+    @filter.command("tts_restore")
+    async def restore_config(self, event: AstrMessageEvent):
+        """[管理员] 恢复上次快照里的配置（音色等被重置时用）。用法: /tts_restore"""
+        if not _is_slash(event):
+            return
+        if not await self._ensure_admin_permission(event):
+            yield event.plain_result("权限不足：该命令仅管理员可用")
+            return
+        drift = self._config_drift or self._check_config_drift()
+        if not drift:
+            yield event.plain_result(
+                "没有检测到配置变化。\n"
+                "如果音色不对，直接去配置页改「朗读音色」——现在改完就生效，不用重载插件。"
+            )
+            return
+        ok = await self._restore_config_snapshot()
+        if ok:
+            head = "已恢复上次的配置：\n" + "\n".join(f"  {d}" for d in drift)
+            voice = getattr(self._engine, "voice", "")
+            yield event.plain_result(
+                f"{head}\n当前朗读音色：{voice or '(未设)'}\n"
+                "发一句测试它读不读得对。"
+            )
+        else:
+            yield event.plain_result("恢复失败：没有可用的快照文件")
+
     @filter.command("tts_doctor")
     async def doctor(self, event: AstrMessageEvent):
         """[管理员] 自检：检查哪些功能不可用、原因与下一步。用法: /tts_doctor"""
@@ -3328,6 +3496,25 @@ class QingYuPlugin(Star):
                 reason = getattr(engine, "SINGING_UNSUPPORTED_REASON", "当前模型不支持唱歌")
                 problems.append(f"唱歌不可用：{reason}")
                 lines.append(f"唱歌　 不可用 {MARK_BAD}（{reason}）")
+
+        # 配置漂移：音色被重置时这里会亮红灯
+        if self._config_drift:
+            lines.append(f"配置　 有 {len(self._config_drift)} 项被重置 {MARK_BAD}")
+            for item in self._config_drift[:4]:
+                lines.append(f"  · {item}")
+            problems.append("配置被重置过（常见于插件更新），发 /tts_restore 恢复")
+        else:
+            lines.append(f"配置　 与上次一致 {MARK_OK}")
+
+        # 音色：直接显示实际生效值
+        try:
+            _v = getattr(self._engine, "voice", "")
+            _sv = getattr(self._engine, "singing_voice", "")
+            lines.append(
+                f"音色　 朗读 {_v or '(未设)'} / 唱歌 {_sv or '跟随朗读'}"
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
         # 克隆音色：样本与当前选择，直接摆出来，免得「不知道咋调用」
         try:
